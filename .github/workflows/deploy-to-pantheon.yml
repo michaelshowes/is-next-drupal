@@ -25,6 +25,9 @@ jobs:
       - name: Validate composer.json
         run: composer validate
 
+      - name: Install dependencies
+        run: composer install --no-dev --optimize-autoloader
+
       - name: Install SSH key
         uses: shimataro/ssh-key-action@v2
         with:
@@ -36,20 +39,45 @@ jobs:
         with:
           pantheon-machine-token: ${{ secrets.TERMINUS_TOKEN }}
 
-      - name: Cleanup before Pantheon deploy
-        run: echo "Add any additional cleanup/compliation tasks here."
+      - name: Prepare for Pantheon deploy
+        run: |
+          # Configure git for commit
+          git config user.name "GitHub Actions"
+          git config user.email "action@github.com"
+          
+          # Remove development files that shouldn't be deployed
+          rm -rf .github
+          
+          # Remove any other development-only files
+          find . -name "*.md" -not -path "./web/*" -delete
+          find . -name ".DS_Store" -delete
+          
+          # Force add vendor directory for Pantheon (it's normally gitignored)
+          git add -f vendor/
+          git add -A
+          git commit -m "Deploy to Pantheon with dependencies" || echo "No changes to commit"
 
       - name: Add Pantheon Git repository URL as known host
         run: ssh-keyscan -t rsa -p ${{ env.PANTHEON_GIT_PORT }} -H ${{ env.PANTHEON_GIT_HOSTNAME }} >> ~/.ssh/known_hosts
 
       - name: Deploy via commit to Pantheon Git repository URL
         run: |
-          git remote add pantheon ssh://${{ env.PANTHEON_GIT_USER }}@${{ env.PANTHEON_GIT_HOSTNAME }}:${{ env.PANTHEON_GIT_PORT }}/~/repository.git;
+          git remote add pantheon ssh://${{ env.PANTHEON_GIT_USER }}@${{ env.PANTHEON_GIT_HOSTNAME }}:${{ env.PANTHEON_GIT_PORT }}/~/repository.git || git remote set-url pantheon ssh://${{ env.PANTHEON_GIT_USER }}@${{ env.PANTHEON_GIT_HOSTNAME }}:${{ env.PANTHEON_GIT_PORT }}/~/repository.git
           git push pantheon HEAD:master --force
 
       - name: Terminus Drush Updates
         run: | 
           terminus env:wake ${{ env.PANTHEON_SITE }}.${{ env.PANTHEON_ENV }} 
           terminus env:code-rebuild ${{ env.PANTHEON_SITE }}.${{ env.PANTHEON_ENV }}
-          terminus drush ${{ env.PANTHEON_SITE }}.${{ env.PANTHEON_ENV }} -- deploy
+          
+          # Enable required modules before config import
+          terminus drush ${{ env.PANTHEON_SITE }}.${{ env.PANTHEON_ENV }} -- pm:enable admin_toolbar admin_toolbar_tools -y || true
+          
+          # Run database updates
+          terminus drush ${{ env.PANTHEON_SITE }}.${{ env.PANTHEON_ENV }} -- updatedb -y
+          
+          # Import configuration (skip if it would delete everything)
+          terminus drush ${{ env.PANTHEON_SITE }}.${{ env.PANTHEON_ENV }} -- config:import --partial -y || true
+          
+          # Clear all caches
           terminus env:clear-cache ${{ env.PANTHEON_SITE }}.${{ env.PANTHEON_ENV }}
