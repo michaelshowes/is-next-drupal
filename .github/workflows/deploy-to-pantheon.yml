@@ -49,7 +49,7 @@ jobs:
 
       - name: Terminus Drush Updates
         run: | 
-          terminus env.wake ${{ env.PANTHEON_SITE }}.${{ env.PANTHEON_ENV }} 
-          terminus env.code-rebuild ${{ env.PANTHEON_SITE }}.${{ env.PANTHEON_ENV }}
+          terminus env:wake ${{ env.PANTHEON_SITE }}.${{ env.PANTHEON_ENV }} 
+          terminus env:code-rebuild ${{ env.PANTHEON_SITE }}.${{ env.PANTHEON_ENV }}
           terminus drush ${{ env.PANTHEON_SITE }}.${{ env.PANTHEON_ENV }} -- deploy
-          terminus env.clear-cache ${{ env.PANTHEON_SITE }}.${{ env.PANTHEON_ENV }}
+          terminus env:clear-cache ${{ env.PANTHEON_SITE }}.${{ env.PANTHEON_ENV }}
