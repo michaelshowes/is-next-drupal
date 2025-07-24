@@ -1,0 +1,52 @@
+name: Deploy to Pantheon
+
+on:
+  push:
+    branches:
+      - main
+
+env:
+  PANTHEON_SITE: is-next-drupal
+  PANTHEON_SITE_ID: 0213e8e7-5c84-41a5-93cc-edf070c69bfc
+  PANTHEON_ENV: dev
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+
+      - name: Validate composer.json
+        run: composer validate
+
+      - name: Install SSH key
+        uses: shimataro/ssh-key-action@v2
+        with:
+          key: ${{ secrets.PANTHEON_SSH_PRIVATE_KEY }}
+          known_hosts: ' '
+          
+      - name: Install Terminus
+        uses: pantheon-systems/terminus-github-actions@main
+        with:
+          pantheon-machine-token: ${{ secrets.TERMINUS_TOKEN }}
+
+      - name: Cleanup before Pantheon deploy
+        run: echo "Add any additional cleanup/compliation tasks here."
+
+      - name: Add Pantheon Git repository URL as known host
+        run: ssh-keyscan -t rsa -p ${{ env.PANTHEON_GIT_PORT }} -H ${{ env.PANTHEON_GIT_HOSTNAME }} >> ~/.ssh/known_hosts
+
+      - name: Deploy via commit to Pantheon Git repository URL
+        run: |
+          git remote add pantheon ssh://${{ env.PANTHEON_GIT_USER }}@${{ env.PANTHEON_GIT_HOSTNAME }}:${{ env.PANTHEON_GIT_PORT }}/~/repository.git;
+          git push pantheon HEAD:master --force
+
+      - name: Terminus Drush Updates
+        run: | 
+          terminus env.wake ${{ env.PANTHEON_SITE }}.${{ env.PANTHEON_ENV }} 
+          terminus env.code-rebuild ${{ env.PANTHEON_SITE }}.${{ env.PANTHEON_ENV }}
+          terminus drush ${{ env.PANTHEON_SITE }}.${{ env.PANTHEON_ENV }} -- deploy
+          terminus env.clear-cache ${{ env.PANTHEON_SITE }}.${{ env.PANTHEON_ENV }}
