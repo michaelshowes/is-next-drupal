@@ -9,6 +9,9 @@ env:
   PANTHEON_SITE: is-next-drupal
   PANTHEON_SITE_ID: 0213e8e7-5c84-41a5-93cc-edf070c69bfc
   PANTHEON_ENV: dev
+  PANTHEON_GIT_USER: codeserver.dev.0213e8e7-5c84-41a5-93cc-edf070c69bfc
+  PANTHEON_GIT_HOSTNAME: codeserver.dev.0213e8e7-5c84-41a5-93cc-edf070c69bfc.drush.in
+  PANTHEON_GIT_PORT: 2222
 
 jobs:
   deploy:
